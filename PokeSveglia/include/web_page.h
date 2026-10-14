@@ -2,7 +2,7 @@
 // Pagina web della sveglia (servita dall'ESP32, funziona anche senza internet:
 // il convertitore di GIF è scritto qui sotto, senza librerie esterne).
 static const char INDEX_HTML[] PROGMEM = R"rawliteral(<!doctype html>
-<html lang="it"><head><meta charset="utf-8">
+<html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>PokeSveglia</title>
 <style>
@@ -66,174 +66,181 @@ input[type=text],input[type=password],input[type=number],select,textarea,.days b
 .g{background:var(--card)}.btn.gray{background:#3a3a50;color:#eee}.net{border-color:#445}.net:hover{background:#2e2e44}}
 </style></head><body>
 <header><div class="brand"><div class="ball"></div>PokeSveglia</div>
-<div class="sub" id="status">Caricamento…</div>
-<nav><button data-t="alarms" class="on">Sveglie</button><button data-t="msg">Messaggi</button><button data-t="gif">Sfondo</button><button data-t="settings">Impostazioni</button><button data-t="wifi">Wi-Fi</button></nav></header>
+<div class="sub" id="status">Loading…</div>
+<nav><button data-t="alarms" class="on">Alarms</button><button data-t="msg">Messages</button><button data-t="gif">Background</button><button data-t="settings">Settings</button><button data-t="wifi">Wi-Fi</button></nav></header>
 <main>
 <section id="alarms" class="on">
  <div id="alarmList"></div>
- <div class="bar"><button class="btn" onclick="saveAlarms()">Salva sveglie</button>
- <button class="btn y" onclick="post('/api/test').then(()=>toast('Suona per 10 secondi…'))">Prova suono</button>
- <button class="btn gray" onclick="post('/api/stop')">Ferma</button></div>
+ <div class="bar"><button class="btn" onclick="saveAlarms()">Save alarms</button>
+ <button class="btn y" onclick="post('/api/test').then(()=>toast(t('Ringing for 10 seconds…')))">Test sound</button>
+ <button class="btn gray" onclick="post('/api/stop')">Stop</button></div>
 </section>
 
 <section id="msg">
- <div class="card"><h2>Invia un messaggio</h2>
-  <textarea id="mtext" maxlength="600" rows="4" placeholder="Scrivi qui: la sveglia lo mostra e lo legge ad alta voce"></textarea>
+ <div class="card"><h2>Send a message</h2>
+  <textarea id="mtext" maxlength="600" rows="4" placeholder="Type here: the clock shows it and reads it aloud"></textarea>
   <div class="row" style="justify-content:space-between"><span class="muted" id="mcount">0/600</span><span class="muted" id="mstat"></span></div>
-  <div class="bar"><button class="btn" id="msend" onclick="sendMsg()">📣 Invia e leggi</button>
-  <button class="btn gray" onclick="post('/api/message/stop')">Interrompi</button></div>
-  <p class="muted">La voce richiede internet (servizio di sintesi vocale di Google). Senza connessione il messaggio viene solo mostrato.</p>
+  <div class="bar"><button class="btn" id="msend" onclick="sendMsg()">📣 Send and read aloud</button>
+  <button class="btn gray" onclick="post('/api/message/stop')">Stop voice</button></div>
+  <p class="muted">The voice needs internet (Google text-to-speech). Without a connection the message is only shown.</p>
  </div>
- <div class="card"><h2>Ultimi messaggi</h2><div id="mhist" class="muted">Nessun messaggio.</div></div>
+ <div class="card"><h2>Recent messages</h2><div id="mhist" class="muted">No messages.</div></div>
 </section>
 
 <section id="gif">
- <div class="card"><h2>GIF in memoria</h2><div class="gifs" id="gifList"></div>
+ <div class="card"><h2>Stored GIFs</h2><div class="gifs" id="gifList"></div>
  <p class="muted" id="fsInfo"></p></div>
- <div class="card"><h2>Posizione e dimensione</h2>
+ <div class="card"><h2>Position and size</h2>
   <div class="lprev"><img id="lpimg" alt=""><div class="lpill"></div><div class="lband"></div></div>
-  <p class="muted" style="text-align:center">Le zone tratteggiate indicano dove compaiono ora e sveglia.</p>
-  <label class="f">Dimensione: <b id="lsV"></b>%</label><input type="range" id="ls" min="40" max="300" step="5">
-  <label class="f">Velocità: <b id="lvV"></b>%</label><input type="range" id="lv" min="25" max="400" step="5">
-  <label class="f">Orizzontale: <b id="lxV"></b></label><input type="range" id="lx" min="-120" max="120">
-  <label class="f">Verticale: <b id="lyV"></b></label><input type="range" id="ly" min="-120" max="120">
+  <p class="muted" style="text-align:center">Dashed areas show where the time and alarm appear.</p>
+  <label class="f">Size: <b id="lsV"></b>%</label><input type="range" id="ls" min="40" max="300" step="5">
+  <label class="f">Speed: <b id="lvV"></b>%</label><input type="range" id="lv" min="25" max="400" step="5">
+  <label class="f">Horizontal: <b id="lxV"></b></label><input type="range" id="lx" min="-120" max="120">
+  <label class="f">Vertical: <b id="lyV"></b></label><input type="range" id="ly" min="-120" max="120">
   <div class="pad">
    <button class="btn gray" onclick="nudge(0,-5,0)">▲</button>
    <button class="btn gray" onclick="nudge(-5,0,0)">◀</button><button class="btn gray" onclick="nudge(5,0,0)">▶</button>
    <button class="btn gray" onclick="nudge(0,5,0)">▼</button>
    <button class="btn gray" onclick="nudge(0,0,-5)">－</button><button class="btn gray" onclick="nudge(0,0,5)">＋</button>
-   <button class="btn y" onclick="setLay(0,0,100,100)">Ripristina</button>
+   <button class="btn y" onclick="setLay(0,0,100,100)">Reset</button>
   </div>
-  <p class="muted">Le modifiche si vedono subito sulla sveglia e vengono salvate per questa GIF.</p>
+  <p class="muted">Changes show up on the clock right away and are saved for this GIF.</p>
  </div>
- <div class="card"><h2>Carica una nuova GIF</h2>
-  <div id="cnaWarn" class="warn" style="display:none"><b>Da questa finestra non puoi scegliere file.</b><br>
-  Sei nella finestrina di accesso alla rete Wi-Fi, che blocca la selezione dei file. Chiudila scegliendo
-  <i>Annulla → Usa senza Internet</i> (o simile), poi apri <b>Safari/Chrome</b> e vai su
-  <b class="addr"></b></div>
-  <label class="btn gray filebtn">📁 Scegli una GIF…<input type="file" id="gfile" accept="image/gif,.gif"></label>
+ <div class="card"><h2>Upload a new GIF</h2>
+  <div id="cnaWarn" class="warn" style="display:none"><b>You can't pick files from this window.</b><br>This is the Wi-Fi sign-in window, which blocks file selection. Close it by choosing <i>Cancel → Use without Internet</i> (or similar), then open <b>Safari/Chrome</b> and go to <b class="addr"></b></div>
+  <label class="btn gray filebtn">📁 Choose a GIF…<input type="file" id="gfile" accept="image/gif,.gif"></label>
   <span class="muted" id="gfname"></span>
-  <p class="muted">Se toccando il pulsante non si apre nulla, apri questa pagina nel browser (Safari o Chrome) all'indirizzo <b class="addr"></b></p>
-  <div class="row"><div class="grow"><label class="f">Adattamento</label><select id="gfit"><option value="contain">Intera (con bordi)</option><option value="cover">Riempi lo schermo</option></select></div>
-  <div class="grow"><label class="f">Sfondo</label><select id="gbg"><option value="auto">Automatico</option><option value="#000000">Nero</option><option value="#ffffff">Bianco</option></select></div></div>
-  <label class="f"><input type="checkbox" id="gpix" checked> Pixel art (bordi nitidi, ideale per gli sprite Pokémon)</label>
-  <label class="f">Nome</label><input type="text" id="gname" placeholder="es. pikachu">
+  <p class="muted">If nothing opens when you tap the button, open this page in the browser (Safari or Chrome) at <b class="addr"></b></p>
+  <div class="row"><div class="grow"><label class="f">Fit</label><select id="gfit"><option value="contain">Whole image (with borders)</option><option value="cover">Fill the screen</option></select></div>
+  <div class="grow"><label class="f">Background</label><select id="gbg"><option value="auto">Automatic</option><option value="#000000">Black</option><option value="#ffffff">White</option></select></div></div>
+  <label class="f"><input type="checkbox" id="gpix" checked> Pixel art (sharp edges, ideal for Pokémon sprites)</label>
+  <label class="f">Name</label><input type="text" id="gname" placeholder="e.g. pikachu">
   <img id="gprev" class="prev" alt="" style="display:none">
   <p class="muted" id="ginfo"></p>
   <progress id="gprog" value="0" max="100" style="display:none"></progress>
-  <div class="bar"><button class="btn" id="gup" disabled onclick="uploadGif()">Carica sulla sveglia</button></div>
+  <div class="bar"><button class="btn" id="gup" disabled onclick="uploadGif()">Upload to the clock</button></div>
  </div>
 </section>
 
 <section id="settings">
- <div class="card"><h2>Suono</h2>
+ <div class="card"><h2>Sound</h2>
   <label class="f">Volume: <b id="volV"></b>%</label><input type="range" id="volume" min="5" max="100" oninput="volV.textContent=this.value">
-  <div class="row"><div class="grow"><label class="f">Posticipa di (minuti)</label><input type="number" id="snoozeMin" min="1" max="30"></div>
-  <div class="grow"><label class="f">Spegni da sola dopo (minuti)</label><input type="number" id="ringMaxMin" min="1" max="60"></div></div>
+  <div class="row"><div class="grow"><label class="f">Snooze for (minutes)</label><input type="number" id="snoozeMin" min="1" max="30"></div>
+  <div class="grow"><label class="f">Auto-stop after (minutes)</label><input type="number" id="ringMaxMin" min="1" max="60"></div></div>
  </div>
- <div class="card"><h2>Schermo</h2>
-  <label class="f">Luminosità giorno: <b id="bdV"></b>%</label><input type="range" id="brightDay" min="5" max="100" oninput="bdV.textContent=this.value">
-  <label class="f">Luminosità notte: <b id="bnV"></b>%</label><input type="range" id="brightNight" min="0" max="100" oninput="bnV.textContent=this.value">
-  <div class="row"><div class="grow"><label class="f">Notte dalle ore</label><input type="number" id="nightStart" min="0" max="23"></div>
-  <div class="grow"><label class="f">alle ore</label><input type="number" id="nightEnd" min="0" max="23"></div></div>
-  <p class="muted">Durante la notte basta toccare lo schermo per riaccenderlo per qualche secondo.</p>
+ <div class="card"><h2>Screen</h2>
+  <label class="f">Day brightness: <b id="bdV"></b>%</label><input type="range" id="brightDay" min="5" max="100" oninput="bdV.textContent=this.value">
+  <label class="f">Night brightness: <b id="bnV"></b>%</label><input type="range" id="brightNight" min="0" max="100" oninput="bnV.textContent=this.value">
+  <div class="row"><div class="grow"><label class="f">Night from (hour)</label><input type="number" id="nightStart" min="0" max="23"></div>
+  <div class="grow"><label class="f">to (hour)</label><input type="number" id="nightEnd" min="0" max="23"></div></div>
+  <p class="muted">At night, touch the screen to light it up for a few seconds.</p>
  </div>
- <div class="card"><h2>Meteo</h2>
-  <label class="f">Città (lascia vuoto per rilevarla automaticamente dalla connessione)</label>
-  <input type="text" id="city" placeholder="automatica">
+ <div class="card"><h2>Weather</h2>
+  <label class="f">City (leave empty to detect it from your connection)</label>
+  <input type="text" id="city" placeholder="automatic">
   <p class="muted" id="wInfo"></p>
  </div>
- <div class="bar"><button class="btn" onclick="saveSettings()">Salva impostazioni</button></div>
+ <div class="card"><h2>Language</h2><select id="lang"><option value="0">Automatic (from location)</option><option value="1">English</option><option value="2">Italiano</option></select></div>
+ <div class="bar"><button class="btn" onclick="saveSettings()">Save settings</button></div>
 </section>
 
 <section id="wifi">
- <div class="card"><h2>Rete Wi-Fi</h2><p class="muted" id="wifiNow"></p>
-  <div class="bar"><button class="btn gray" onclick="scan()">Cerca reti</button></div>
+ <div class="card"><h2>Wi-Fi network</h2><p class="muted" id="wifiNow"></p>
+  <div class="bar"><button class="btn gray" onclick="scan()">Scan networks</button></div>
   <div id="nets"></div>
-  <label class="f">Nome rete (SSID)</label><input type="text" id="ssid" autocomplete="off">
+  <label class="f">Network name (SSID)</label><input type="text" id="ssid" autocomplete="off">
   <label class="f">Password</label><input type="password" id="pass">
-  <div class="bar"><button class="btn" onclick="saveWifi()">Connetti e riavvia</button></div>
+  <div class="bar"><button class="btn" onclick="saveWifi()">Connect and restart</button></div>
  </div>
 </section>
 </main>
 <div id="toast"></div>
 <script>
 const $=id=>document.getElementById(id);
-let S=null;const DAYS=['L','M','M','G','V','S','D'];
+let LANG='en',i18nDone=false;
+const IT={"Loading…":"Caricamento…","Alarms":"Sveglie","Messages":"Messaggi","Background":"Sfondo","Settings":"Impostazioni","Save alarms":"Salva sveglie","Test sound":"Prova suono","Stop":"Ferma","Send a message":"Invia un messaggio","Type here: the clock shows it and reads it aloud":"Scrivi qui: la sveglia lo mostra e lo legge ad alta voce","📣 Send and read aloud":"📣 Invia e leggi","Stop voice":"Interrompi","The voice needs internet (Google text-to-speech). Without a connection the message is only shown.":"La voce richiede internet (servizio di sintesi vocale di Google). Senza connessione il messaggio viene solo mostrato.","Recent messages":"Ultimi messaggi","No messages.":"Nessun messaggio.","Stored GIFs":"GIF in memoria","Position and size":"Posizione e dimensione","Dashed areas show where the time and alarm appear.":"Le zone tratteggiate indicano dove compaiono ora e sveglia.","Size:":"Dimensione:","Speed:":"Velocità:","Horizontal:":"Orizzontale:","Vertical:":"Verticale:","Reset":"Ripristina","Changes show up on the clock right away and are saved for this GIF.":"Le modifiche si vedono subito sulla sveglia e vengono salvate per questa GIF.","Upload a new GIF":"Carica una nuova GIF","You can't pick files from this window.":"Da questa finestra non puoi scegliere file.","This is the Wi-Fi sign-in window, which blocks file selection. Close it by choosing":"Sei nella finestrina di accesso alla rete Wi-Fi, che blocca la selezione dei file. Chiudila scegliendo","Cancel → Use without Internet":"Annulla → Usa senza Internet","(or similar), then open":"(o simile), poi apri","and go to":"e vai su","📁 Choose a GIF…":"📁 Scegli una GIF…","If nothing opens when you tap the button, open this page in the browser (Safari or Chrome) at":"Se toccando il pulsante non si apre nulla, apri questa pagina nel browser (Safari o Chrome) all'indirizzo","Fit":"Adattamento","Whole image (with borders)":"Intera (con bordi)","Fill the screen":"Riempi lo schermo","Automatic":"Automatico","Black":"Nero","White":"Bianco","Pixel art (sharp edges, ideal for Pokémon sprites)":"Pixel art (bordi nitidi, ideale per gli sprite Pokémon)","Name":"Nome","e.g. pikachu":"es. pikachu","Upload to the clock":"Carica sulla sveglia","Sound":"Suono","Snooze for (minutes)":"Posticipa di (minuti)","Auto-stop after (minutes)":"Spegni da sola dopo (minuti)","Screen":"Schermo","Day brightness:":"Luminosità giorno:","Night brightness:":"Luminosità notte:","Night from (hour)":"Notte dalle ore","to (hour)":"alle ore","At night, touch the screen to light it up for a few seconds.":"Durante la notte basta toccare lo schermo per riaccenderlo per qualche secondo.","Weather":"Meteo","City (leave empty to detect it from your connection)":"Città (lascia vuoto per rilevarla automaticamente dalla connessione)","automatic":"automatica","Language":"Lingua","Automatic (from location)":"Automatica (dalla posizione)","Save settings":"Salva impostazioni","Wi-Fi network":"Rete Wi-Fi","Scan networks":"Cerca reti","Network name (SSID)":"Nome rete (SSID)","Connect and restart":"Connetti e riavvia","Connected to":"Connessa a","address":"indirizzo","or":"oppure","The clock is not connected to any network.":"La sveglia non è connessa a nessuna rete.","Current weather for:":"Meteo attuale per:","Weather not available yet.":"Meteo non ancora disponibile.","charging":"in carica","USB powered":"alimentata da USB","Time":"Ora","from phone":"dal telefono","Not connected to the internet":"Non connessa a internet","setup network on":"rete di configurazione attiva","Label (optional)":"Etichetta (facoltativa)","No day selected: rings only once":"Nessun giorno selezionato: suona una volta sola","Alarms saved ✓":"Sveglie salvate ✓","Save failed":"Errore nel salvataggio","Settings saved ✓":"Impostazioni salvate ✓","Background changed ✓":"Sfondo cambiato ✓","Write a message":"Scrivi un messaggio","Message sent ✓":"Messaggio inviato ✓","Enter the network name":"Inserisci il nome della rete","Saved. The clock restarts and connects…":"Salvato. La sveglia si riavvia e si connette…","GIF uploaded ✓":"GIF caricata ✓","Time taken from your phone ✓":"Ora presa dal telefono ✓","Converting…":"Conversione in corso…","Ringing for 10 seconds…":"Suona per 10 secondi…","Network error":"Errore di rete","Error":"Errore","In use":"In uso","Use":"Usa","Delete":"Eliminare","Storage used":"Memoria usata","Preparing voice…":"Preparo la voce…","Reading aloud…":"Sto leggendo…","tap to resend":"tocca per reinviare","Searching…":"Ricerca in corso…","This file is not a GIF":"Il file non è una GIF","GIF has no frames":"GIF senza fotogrammi","Too many frames":"Troppi fotogrammi","Original":"Originale","frames":"fotogrammi","too big (max 3.5 MB): choose a shorter GIF":"troppo grande (max 3,5 MB): scegli una GIF più corta","already exists. Replace it?":"esiste già. Sostituirla?","Invalid JSON":"JSON non valido","GIF not found":"GIF non trovata","You can't delete the GIF in use":"Non puoi eliminare la GIF in uso","Upload failed (storage full?)":"Caricamento fallito (memoria piena?)","Missing SSID":"SSID mancante","Empty message":"Messaggio vuoto","Too many queued messages, try again shortly":"Troppi messaggi in coda, riprova tra poco","error: no Wi-Fi, no voice":"errore: Wi-Fi assente, nessuna voce","error: download interrupted":"errore: download interrotto"};
+const t=s=>LANG==='it'&&IT[s]||s;
+// traduce una sola volta i testi fissi della pagina (scritta in inglese)
+function i18nDom(){if(i18nDone)return;i18nDone=true;document.documentElement.lang=LANG;if(LANG!=='it')return;
+ const w=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);let n;while((n=w.nextNode())){const k=n.nodeValue.trim();if(k&&IT[k])n.nodeValue=n.nodeValue.replace(k,IT[k])}
+ document.querySelectorAll('[placeholder]').forEach(e=>{if(IT[e.placeholder])e.placeholder=IT[e.placeholder]})}
+let S=null;const DAYS=()=>LANG==='it'?['L','M','M','G','V','S','D']:['M','T','W','T','F','S','S'];
 function toast(t){const e=$('toast');e.textContent=t;e.classList.add('on');clearTimeout(e._t);e._t=setTimeout(()=>e.classList.remove('on'),2500)}
 function post(u,body){return fetch(u,{method:'POST',headers:{'Content-Type':'application/json'},body:body?JSON.stringify(body):'{}'}).then(r=>{if(!r.ok)throw new Error(r.status);return r})}
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{document.querySelectorAll('nav button,section').forEach(x=>x.classList.remove('on'));b.classList.add('on');$(b.dataset.t).classList.add('on')});
 const pad=n=>String(n).padStart(2,'0');
 async function load(){
  S=await (await fetch('/api/state')).json();
+ LANG=S.lang==='it'?'it':'en';i18nDom();
  const w=S.wifi;
- $('status').textContent=(S.time?'Ora: '+S.time+(S.timeSrc===3?' (dal telefono)':'')+' · ':'')+(w.connected?'Connessa a '+w.ssid+' ('+w.ip+')':'Non connessa a internet')+(w.portal?' · rete di configurazione attiva':'')+batTxt(S.battery);
- $('wifiNow').textContent=w.connected?'Connessa a "'+w.ssid+'" — indirizzo http://'+w.ip+'  (oppure http://pokesveglia.local)':'La sveglia non è connessa a nessuna rete.';
+ $('status').textContent=statusLine(S);
+ $('wifiNow').textContent=w.connected?t('Connected to')+' "'+w.ssid+'" — '+t('address')+' http://'+w.ip+'  ('+t('or')+' http://pokesveglia.local)':t('The clock is not connected to any network.');
  if(!$('ssid').value)$('ssid').value=w.ssid||'';
  renderAlarms();renderGifs();renderLay();renderMsgs(S);
  const st=S.settings;for(const k of ['volume','snoozeMin','ringMaxMin','brightDay','brightNight','nightStart','nightEnd','city'])$(k).value=st[k];
- volV.textContent=st.volume;bdV.textContent=st.brightDay;bnV.textContent=st.brightNight;
- $('wInfo').textContent=S.weather.valid?'Meteo attuale per: '+S.weather.city:'Meteo non ancora disponibile.';
+ volV.textContent=st.volume;$('lang').value=st.lang||0;bdV.textContent=st.brightDay;bnV.textContent=st.brightNight;
+ $('wInfo').textContent=S.weather.valid?t('Current weather for:')+' '+S.weather.city:t('Weather not available yet.');
 }
-function batTxt(b){if(!b)return'';return' · '+(b.charging?'⚡ in carica '+b.level+'%':b.usb?'🔌 alimentata da USB':'🔋 '+b.level+'%')}
+function batTxt(b){if(!b)return'';return' · '+(b.charging?'⚡ '+t('charging')+' '+b.level+'%':b.usb?'🔌 '+t('USB powered'):'🔋 '+b.level+'%')}
+function statusLine(st){const w=st.wifi;return(st.time?t('Time')+': '+st.time+(st.timeSrc===3?' ('+t('from phone')+')':'')+' · ':'')+(w.connected?t('Connected to')+' '+w.ssid+' ('+w.ip+')':t('Not connected to the internet'))+(w.portal?' · '+t('setup network on'):'')+batTxt(st.battery)}
 function renderAlarms(){
  const L=$('alarmList');L.innerHTML='';
  S.alarms.forEach((a,i)=>{
   const c=document.createElement('div');c.className='card';
   c.innerHTML=`<div class="row"><input type="time" value="${pad(a.h)}:${pad(a.m)}" data-k="t">
-  <input type="text" class="grow" style="width:auto" maxlength="20" placeholder="Etichetta (facoltativa)" value="${(a.label||'').replace(/"/g,'&quot;')}" data-k="l">
+  <input type="text" class="grow" style="width:auto" maxlength="20" placeholder="${t('Label (optional)')}" value="${(a.label||'').replace(/"/g,'&quot;')}" data-k="l">
   <label class="sw"><input type="checkbox" ${a.en?'checked':''} data-k="e"><span></span></label></div>
-  <div class="days">${DAYS.map((d,j)=>`<button class="${a.days>>j&1?'on':''}" data-j="${j}">${d}</button>`).join('')}</div>
-  <div class="muted" style="margin-top:6px">${a.days?'':'Nessun giorno selezionato: suona una volta sola'}</div>`;
-  c.querySelectorAll('.days button').forEach(b=>b.onclick=()=>{a.days^=1<<b.dataset.j;b.classList.toggle('on');c.querySelector('.muted').textContent=a.days?'':'Nessun giorno selezionato: suona una volta sola'});
+  <div class="days">${DAYS().map((d,j)=>`<button class="${a.days>>j&1?'on':''}" data-j="${j}">${d}</button>`).join('')}</div>
+  <div class="muted" style="margin-top:6px">${a.days?'':t('No day selected: rings only once')}</div>`;
+  c.querySelectorAll('.days button').forEach(b=>b.onclick=()=>{a.days^=1<<b.dataset.j;b.classList.toggle('on');c.querySelector('.muted').textContent=a.days?'':t('No day selected: rings only once')});
   c.querySelector('[data-k=t]').onchange=e=>{const[h,m]=e.target.value.split(':');a.h=+h;a.m=+m};
   c.querySelector('[data-k=l]').oninput=e=>a.label=e.target.value;
   c.querySelector('[data-k=e]').onchange=e=>a.en=e.target.checked;
   L.appendChild(c);
  });
 }
-function saveAlarms(){post('/api/alarms',S.alarms).then(()=>toast('Sveglie salvate ✓')).catch(()=>toast('Errore nel salvataggio'))}
-function saveSettings(){const st={};for(const k of ['volume','snoozeMin','ringMaxMin','brightDay','brightNight','nightStart','nightEnd'])st[k]=+$(k).value;st.city=$('city').value.trim();
- post('/api/settings',st).then(()=>{toast('Impostazioni salvate ✓');setTimeout(load,4000)}).catch(()=>toast('Errore'))}
+function saveAlarms(){post('/api/alarms',S.alarms).then(()=>toast(t('Alarms saved ✓'))).catch(()=>toast(t('Save failed')))}
+function saveSettings(){const st={};for(const k of ['volume','snoozeMin','ringMaxMin','brightDay','brightNight','nightStart','nightEnd'])st[k]=+$(k).value;st.city=$('city').value.trim();st.lang=+$('lang').value;const langChanged=st.lang!==(S.settings.lang||0);
+ post('/api/settings',st).then(()=>{toast(t('Settings saved ✓'));if(langChanged)setTimeout(()=>location.reload(),900);else setTimeout(load,4000)}).catch(()=>toast(t('Error')))}
 function renderGifs(){
  const L=$('gifList');L.innerHTML='';
  S.gifs.forEach(g=>{const d=document.createElement('div');d.className='g'+(g.name===S.settings.gif?' cur':'');
   d.innerHTML=`<img loading="lazy" src="/gifs/${encodeURIComponent(g.name)}"><div class="n">${g.name.replace(/\.gif$/,'')}</div><div class="muted">${(g.size/1024).toFixed(0)} KB</div>
-  <div class="bar">${g.name===S.settings.gif?'<b>In uso</b>':`<button class="btn" data-a="use">Usa</button><button class="btn red" data-a="del">✕</button>`}</div>`;
-  const u=d.querySelector('[data-a=use]');if(u)u.onclick=()=>post('/api/gif/select?name='+encodeURIComponent(g.name)).then(()=>{toast('Sfondo cambiato ✓');setTimeout(load,500)});
-  const x=d.querySelector('[data-a=del]');if(x)x.onclick=()=>{if(confirm('Eliminare '+g.name+'?'))post('/api/gif/delete?name='+encodeURIComponent(g.name)).then(load)};
+  <div class="bar">${g.name===S.settings.gif?'<b>'+t('In use')+'</b>':`<button class="btn" data-a="use">${t('Use')}</button><button class="btn red" data-a="del">✕</button>`}</div>`;
+  const u=d.querySelector('[data-a=use]');if(u)u.onclick=()=>post('/api/gif/select?name='+encodeURIComponent(g.name)).then(()=>{toast(t('Background changed ✓'));setTimeout(load,500)});
+  const x=d.querySelector('[data-a=del]');if(x)x.onclick=()=>{if(confirm(t('Delete')+' '+g.name+'?'))post('/api/gif/delete?name='+encodeURIComponent(g.name)).then(load)};
   L.appendChild(d)});
- $('fsInfo').textContent=`Memoria usata: ${(S.fs.used/1048576).toFixed(1)} MB su ${(S.fs.total/1048576).toFixed(1)} MB`;
+ $('fsInfo').textContent=`${t('Storage used')}: ${(S.fs.used/1048576).toFixed(1)} MB / ${(S.fs.total/1048576).toFixed(1)} MB`;
 }
 $('mtext').oninput=()=>$('mcount').textContent=$('mtext').value.length+'/600';
-const SPST={idle:'',download:'Preparo la voce…',voce:'Sto leggendo…'};
+const SPST=k=>k==='idle'?'':k==='download'?t('Preparing voice…'):k==='speaking'?t('Reading aloud…'):t(k);
 function renderMsgs(st){
- $('mstat').textContent=SPST[st.speech]??st.speech;
- const h=$('mhist');if(!st.messages||!st.messages.length){h.textContent='Nessun messaggio.';return}
+ $('mstat').textContent=SPST(st.speech||'idle');
+ const h=$('mhist');if(!st.messages||!st.messages.length){h.textContent=t('No messages.');return}
  h.innerHTML='';st.messages.forEach(m=>{const d=document.createElement('div');d.className='hist';
-  const t=m.at>1700000000?new Date(m.at*1000).toLocaleString('it-IT',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'';
-  d.innerHTML=`<small>${t} · tocca per reinviare</small><div></div>`;d.lastChild.textContent=m.text;
+  const t=m.at>1700000000?new Date(m.at*1000).toLocaleString(LANG==='it'?'it-IT':'en-GB',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'';
+  d.innerHTML=`<small>${t} · ${t('tap to resend')}</small><div></div>`;d.lastChild.textContent=m.text;
   d.onclick=()=>{$('mtext').value=m.text;$('mtext').oninput();window.scrollTo(0,0)};h.appendChild(d)})}
 let msgPoll=null;
-function sendMsg(){const t=$('mtext').value.trim();if(!t)return toast('Scrivi un messaggio');
+function sendMsg(){const t=$('mtext').value.trim();if(!t)return toast(t('Write a message'));
  $('msend').disabled=true;
  fetch('/api/message',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:t})})
- .then(async r=>{if(!r.ok)throw new Error(await r.text());toast('Messaggio inviato ✓');$('mtext').value='';$('mtext').oninput();
+ .then(async r=>{if(!r.ok)throw new Error(await r.text());toast(t('Message sent ✓'));$('mtext').value='';$('mtext').oninput();
   clearInterval(msgPoll);let n=0;msgPoll=setInterval(()=>fetch('/api/state').then(r=>r.json()).then(st=>{renderMsgs(st);if(++n>40||(n>3&&st.speech==='idle'))clearInterval(msgPoll)}),1500)})
- .catch(e=>toast('Errore: '+e.message)).finally(()=>$('msend').disabled=false)}
+ .catch(e=>toast(t('Error')+': '+t(e.message))).finally(()=>$('msend').disabled=false)}
 let L={x:0,y:0,s:100},layTimer=null;
 function renderLay(){L={v:100,...S.layout};$('lpimg').src='/gifs/'+encodeURIComponent(S.settings.gif);showLay()}
 function showLay(){$('lx').value=L.x;$('ly').value=L.y;$('ls').value=L.s;$('lv').value=L.v;$('lvV').textContent=L.v;$('lxV').textContent=L.x;$('lyV').textContent=L.y;$('lsV').textContent=L.s;
  const k=200/240;$('lpimg').style.transform=`translate(${L.x*k}px,${L.y*k}px) scale(${L.s/100})`}
 function setLay(x,y,s,v=L.v){L={x:Math.max(-120,Math.min(120,x)),y:Math.max(-120,Math.min(120,y)),s:Math.max(40,Math.min(300,s)),v:Math.max(25,Math.min(400,v))};showLay();
- clearTimeout(layTimer);layTimer=setTimeout(()=>post('/api/gif/layout',L).catch(()=>toast('Errore di rete')),120)}
+ clearTimeout(layTimer);layTimer=setTimeout(()=>post('/api/gif/layout',L).catch(()=>toast(t('Network error'))),120)}
 function nudge(dx,dy,ds){setLay(L.x+dx,L.y+dy,L.s+ds)}
 ['lx','ly','ls','lv'].forEach(id=>$(id).oninput=()=>setLay(+$('lx').value,+$('ly').value,+$('ls').value,+$('lv').value));
-async function scan(){$('nets').innerHTML='<p class="muted">Ricerca in corso…</p>';
+async function scan(){$('nets').innerHTML='<p class="muted">'+t('Searching…')+'</p>';
  const r=await (await fetch('/api/wifi/scan')).json();
  $('nets').innerHTML='';r.forEach(n=>{const d=document.createElement('div');d.className='net';d.innerHTML=`<span>${n.ssid.replace(/</g,'&lt;')}</span><span class="muted">${n.rssi} dBm ${n.open?'':'🔒'}</span>`;d.onclick=()=>{$('ssid').value=n.ssid;$('pass').focus()};$('nets').appendChild(d)})}
-function saveWifi(){if(!$('ssid').value)return toast('Inserisci il nome della rete');
- post('/api/wifi',{ssid:$('ssid').value,pass:$('pass').value}).then(()=>toast('Salvato. La sveglia si riavvia e si connette…'))}
+function saveWifi(){if(!$('ssid').value)return toast(t('Enter the network name'));
+ post('/api/wifi',{ssid:$('ssid').value,pass:$('pass').value}).then(()=>toast(t('Saved. The clock restarts and connects…')))}
 
 /* ================= Convertitore GIF (240x240) ================= */
 const SZ=240;let gifBlob=null;
@@ -261,7 +268,7 @@ function lzwDecode(minCode,data,npix){
 }
 function parseGif(buf){
  const d=new Uint8Array(buf);let p=0;const u16=()=>{const v=d[p]|d[p+1]<<8;p+=2;return v};
- if(d[0]!==71||d[1]!==73||d[2]!==70)throw new Error('Il file non è una GIF');
+ if(d[0]!==71||d[1]!==73||d[2]!==70)throw new Error('This file is not a GIF');
  p=6;const W=u16(),H=u16(),f=d[p++];p+=2;let gct=null;
  if(f&0x80){const n=2<<(f&7);gct=d.subarray(p,p+n*3);p+=n*3}
  const frames=[];let gce={delay:100,trans:-1,disp:0};
@@ -280,7 +287,7 @@ function parseGif(buf){
    gce={delay:100,trans:-1,disp:0};
   }else break;
  }
- if(!frames.length)throw new Error('GIF senza fotogrammi');
+ if(!frames.length)throw new Error('GIF has no frames');
  return {W,H,frames};
 }
 function compose(g,fit,pixel,bgSel){
@@ -348,18 +355,18 @@ function encodeGif(q,frames){
  w.put(0x3B);return new Blob([w.b.subarray(0,w.n)],{type:'image/gif'});
 }
 async function convert(){
- const f=$('gfile').files[0];if(!f)return;$('gup').disabled=true;gifBlob=null;$('ginfo').textContent='Conversione in corso…';
+ const f=$('gfile').files[0];if(!f)return;$('gup').disabled=true;gifBlob=null;$('ginfo').textContent=t('Converting…');
  await new Promise(r=>setTimeout(r,30));
  try{const g=parseGif(await f.arrayBuffer());
-  if(g.frames.length>250)throw new Error('Troppi fotogrammi ('+g.frames.length+'), massimo 250');
+  if(g.frames.length>250)throw new Error(t('Too many frames')+' ('+g.frames.length+'), max 250');
   const fr=compose(g,$('gfit').value,$('gpix').checked,$('gbg').value);
   const q=quantize(fr);gifBlob=encodeGif(q,fr);
   $('gprev').src=URL.createObjectURL(gifBlob);$('gprev').style.display='block';
   const kb=gifBlob.size/1024;
-  $('ginfo').textContent=`Originale ${g.W}×${g.H}, ${g.frames.length} fotogrammi → 240×240, ${kb.toFixed(0)} KB`;
-  if(gifBlob.size>3.5*1048576){$('ginfo').textContent+=' — troppo grande (max 3,5 MB): scegli una GIF più corta';return}
+  $('ginfo').textContent=`${t('Original')} ${g.W}×${g.H}, ${g.frames.length} ${t('frames')} → 240×240, ${kb.toFixed(0)} KB`;
+  if(gifBlob.size>3.5*1048576){$('ginfo').textContent+=' — '+t('too big (max 3.5 MB): choose a shorter GIF');return}
   $('gup').disabled=false;
- }catch(e){$('ginfo').textContent='Errore: '+e.message}
+ }catch(e){$('ginfo').textContent=t('Error')+': '+t(e.message)}
 }
 // finestrina "captive" di iOS/macOS: niente Safari nello user agent -> i file non si possono scegliere
 const inCNA=/iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent)&&!/Safari|CriOS|FxiOS/.test(navigator.userAgent);
@@ -369,16 +376,16 @@ $('gfile').addEventListener('change',()=>{const f=$('gfile').files[0];$('gfname'
 ['gfile','gfit','gpix','gbg'].forEach(id=>$(id).onchange=()=>{if(id==='gfile'&&$('gfile').files[0])$('gname').value=$('gfile').files[0].name.replace(/\.gif$/i,'');convert()});
 const cleanName=s=>s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9_-]+/g,'_').slice(0,30)||'gif';
 function uploadGif(){if(!gifBlob)return;const name=cleanName($('gname').value)+'.gif';
- if(S.gifs.some(g=>g.name===name)&&!confirm(name+' esiste già. Sostituirla?'))return;
+ if(S.gifs.some(g=>g.name===name)&&!confirm(name+' '+t('already exists. Replace it?')))return;
  const fd=new FormData();fd.append('file',gifBlob,name);const x=new XMLHttpRequest();
  x.open('POST','/api/gif/upload?name='+encodeURIComponent(name));
  $('gprog').style.display='block';$('gup').disabled=true;
  x.upload.onprogress=e=>{if(e.lengthComputable)$('gprog').value=e.loaded/e.total*100};
- x.onload=()=>{$('gprog').style.display='none';$('gup').disabled=false;if(x.status===200){toast('GIF caricata ✓');load()}else toast('Errore: '+x.responseText)};
- x.onerror=()=>{$('gprog').style.display='none';$('gup').disabled=false;toast('Errore di rete')};
+ x.onload=()=>{$('gprog').style.display='none';$('gup').disabled=false;if(x.status===200){toast(t('GIF uploaded ✓'));load()}else toast(t('Error')+': '+t(x.responseText))};
+ x.onerror=()=>{$('gprog').style.display='none';$('gup').disabled=false;toast(t('Network error'))};
  x.send(fd)}
 // se la sveglia non ha l'ora da internet, le passa quella del telefono
 post('/api/time',{epoch:Math.floor(Date.now()/1000),tz:Intl.DateTimeFormat().resolvedOptions().timeZone||'',offset:new Date().getTimezoneOffset()})
- .then(r=>r.json()).then(j=>{if(j.applied){toast('Ora presa dal telefono ✓');setTimeout(load,300)}}).catch(()=>{});
-load();setInterval(()=>{if(document.visibilityState==='visible'&&!document.activeElement.matches('input,select'))fetch('/api/state').then(r=>r.json()).then(s=>{S.time=s.time;S.wifi=s.wifi;$('status').textContent=(s.time?'Ora: '+s.time+' · ':'')+(s.wifi.connected?'Connessa a '+s.wifi.ssid+' ('+s.wifi.ip+')':'Non connessa a internet')}).catch(()=>{})},15000);
+ .then(r=>r.json()).then(j=>{if(j.applied){toast(t('Time taken from your phone ✓'));setTimeout(load,300)}}).catch(()=>{});
+load();setInterval(()=>{if(document.visibilityState==='visible'&&!document.activeElement.matches('input,select'))fetch('/api/state').then(r=>r.json()).then(s=>{S.time=s.time;S.wifi=s.wifi;S.battery=s.battery;S.timeSrc=s.timeSrc;$('status').textContent=statusLine(S)}).catch(()=>{})},15000);
 </script></body></html>)rawliteral";

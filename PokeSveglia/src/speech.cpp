@@ -87,7 +87,7 @@ static int chunkEnd(const char* s, int start, int len) {
 }
 
 static bool fetchChunk(const char* text, int n, PsramSink& sink) {
-  String url = "https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=it&q=" + urlEncode(text, n);
+  String url = String("https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=") + (uiLang == 1 ? "it" : "en") + "&q=" + urlEncode(text, n);
   WiFiClientSecure client;
   client.setInsecure();
   HTTPClient http;
@@ -98,14 +98,14 @@ static bool fetchChunk(const char* text, int n, PsramSink& sink) {
   int code = http.GET();
   if (code != 200) {
     char b[48];
-    snprintf(b, sizeof(b), "errore: il servizio voce risponde %d", code);
+    snprintf(b, sizeof(b), "error: voice service replied %d", code);
     setStatus(b);
     http.end();
     return false;
   }
   int r = http.writeToStream(&sink);
   http.end();
-  if (r <= 0) setStatus("errore: download interrotto");
+  if (r <= 0) setStatus("error: download interrupted");
   return r > 0;
 }
 
@@ -124,7 +124,7 @@ static void speechTask(void*) {
     showing = true;
 
     bool ok = WiFi.status() == WL_CONNECTED;
-    if (!ok) setStatus("errore: Wi-Fi assente, nessuna voce");
+    if (!ok) setStatus("error: no Wi-Fi, no voice");
     PsramSink sink;
     if (ok) {
       setStatus("download");
@@ -137,7 +137,7 @@ static void speechTask(void*) {
       }
     }
     if (ok && sink.len && showing) {
-      setStatus("voce");
+      setStatus("speaking");
       audioSpeakMp3(sink.buf, sink.len);
       setStatus("idle");
     }

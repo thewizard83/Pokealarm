@@ -9,7 +9,7 @@ The repository holds two firmware projects that share the same features and web 
 | [`PokeSveglia/`](PokeSveglia) | **XiaoZhi "DeepSeek AI" voice robot** (Spotpear ESP32-S3-1.28-BOX, touch + battery version) | 1.28" round, 240×240, touch |
 | [`m5stack/`](m5stack) | **M5Stack Core2 for AWS IoT EduKit** (K010-AWS) | 2.0" rectangular, 320×240, touch |
 
-The on-device interface is in Italian ("sveglia" means alarm clock). The code comments are in Italian too.
+The interface (screen and web page) is in **English by default** and switches to **Italian** automatically when the device is located in Italy, San Marino, or Vatican City. The country is detected from the connection. You can also force a language in *Settings → Language*. The text-to-speech voice and the weather place names follow the same language. Code comments are in Italian ("sveglia" means alarm clock).
 
 ## Features
 
@@ -47,6 +47,18 @@ The on-device interface is in Italian ("sveglia" means alarm clock). The code co
 - **Night light**: a warm amber glow from 22:00 until the first alarm of the night. The start time and intensity can be changed.
 - **Knock twice** on the case to turn the night light on or off, detected by the accelerometer.
 - Physical touch buttons A/B/C below the screen: weather, clock, and alarms.
+
+## Screenshots
+
+These show the web interface of the XiaoZhi robot version, captured with the Italian interface.
+
+| Alarms | Messages | Stored GIFs |
+|---|---|---|
+| ![Alarms](docs/screenshots/alarms.png) | ![Messages](docs/screenshots/messages.png) | ![Stored GIFs](docs/screenshots/background-gifs.png) |
+
+| GIF position, size and speed | Upload a new GIF | Settings | Wi-Fi |
+|---|---|---|---|
+| ![Position and size](docs/screenshots/position-size.png) | ![Upload a GIF](docs/screenshots/upload-gif.png) | ![Settings](docs/screenshots/settings.png) | ![Wi-Fi](docs/screenshots/wifi.png) |
 
 ## Getting started
 

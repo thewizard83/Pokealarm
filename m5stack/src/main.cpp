@@ -31,6 +31,8 @@ volatile bool weatherRefreshRequested = false;
 volatile bool testAlarmRequested = false;
 volatile bool stopAlarmRequested = false;
 volatile bool portalActive = false;
+volatile uint8_t uiLang = 0;    // 0 = inglese (predefinita), 1 = italiano
+static char detectedCountry[3] = "";
 bool hasAccelerometer = false;
 volatile uint8_t timeSource = TIME_NONE;
 
@@ -98,8 +100,12 @@ static constexpr uint16_t C_CYAN = rgb(110, 200, 255);
 static constexpr uint16_t C_ORANGE = rgb(255, 140, 40);
 static constexpr uint16_t C_NAVY = rgb(16, 26, 58);
 
-static const char* DOW[] = {"DOM", "LUN", "MAR", "MER", "GIO", "VEN", "SAB"};
-static const char* MON[] = {"GEN", "FEB", "MAR", "APR", "MAG", "GIU", "LUG", "AGO", "SET", "OTT", "NOV", "DIC"};
+static const char* DOW_IT[] = {"DOM", "LUN", "MAR", "MER", "GIO", "VEN", "SAB"};
+static const char* MON_IT[] = {"GEN", "FEB", "MAR", "APR", "MAG", "GIU", "LUG", "AGO", "SET", "OTT", "NOV", "DIC"};
+static const char* DOW_EN[] = {"SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"};
+static const char* MON_EN[] = {"JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"};
+#define DOW (uiLang == 1 ? DOW_IT : DOW_EN)
+#define MON (uiLang == 1 ? MON_IT : MON_EN)
 
 void showToast(const char* msg, uint32_t ms = 3000) {
   strlcpy(toastMsg, msg, sizeof(toastMsg));
@@ -138,6 +144,7 @@ void saveConfig() {
   s["nightLightLevel"] = settings.nightLightLevel;
   s["city"] = settings.city;
   s["gif"] = settings.gif;
+  s["lang"] = settings.lang;
   xSemaphoreGive(dataMutex);
 
   File f = LittleFS.open("/config.json", "w");
@@ -182,6 +189,25 @@ void loadConfig() {
   settings.nightLightLevel = s["nightLightLevel"] | settings.nightLightLevel;
   strlcpy(settings.city, s["city"] | "", sizeof(settings.city));
   strlcpy(settings.gif, s["gif"] | settings.gif, sizeof(settings.gif));
+  settings.lang = s["lang"] | 0;
+}
+
+// Lingua: italiano se la sveglia si trova in Italia, San Marino o Vaticano, altrimenti inglese
+// (a meno che non sia scelta a mano nelle impostazioni)
+void applyLanguage() {
+  bool itCountry = !strcmp(detectedCountry, "IT") || !strcmp(detectedCountry, "SM") || !strcmp(detectedCountry, "VA");
+  uiLang = settings.lang == 1 ? 0 : settings.lang == 2 ? 1 : (itCountry ? 1 : 0);
+}
+
+void setDetectedCountry(const char* cc) {
+  if (cc && strlen(cc) == 2 && strcmp(cc, detectedCountry) != 0) {
+    strlcpy(detectedCountry, cc, sizeof(detectedCountry));
+    Preferences p;  // ricordato per i riavvii senza internet
+    p.begin("clock", false);
+    p.putString("cc", cc);
+    p.end();
+  }
+  applyLanguage();
 }
 
 void saveWifi(const String& ssid, const String& pass) {
@@ -568,7 +594,7 @@ static uint8_t nightLightLevel() {
 static void toggleNightLight() {
   bool on = nightLightLevel() > 0;
   nightForce = on ? -1 : 1;
-  showToast(on ? "Luce notturna spenta" : "Luce notturna accesa");
+  showToast(on ? T("Night light off", "Luce notturna spenta") : T("Night light on", "Luce notturna accesa"));
 }
 
 static void updateLedsAndVibration() {
@@ -735,7 +761,7 @@ static void snooze() {
   snoozeUntil = time(nullptr) + settings.snoozeMin * 60;
   testStopAt = 0;
   char b[40];
-  snprintf(b, sizeof(b), "Posticipata di %d min", settings.snoozeMin);
+  snprintf(b, sizeof(b), T("Snoozed for %d min", "Posticipata di %d min"), settings.snoozeMin);
   showToast(b);
 }
 
@@ -744,7 +770,7 @@ static void stopRing() {
   ringState = RING_IDLE;
   ringingAlarm = -1;
   testStopAt = 0;
-  showToast("Buongiorno!");
+  showToast(T("Good morning!", "Buongiorno!"));
 }
 
 static void alarmLogic() {
@@ -921,16 +947,16 @@ static void drawWeatherIcon(int x, int y, int code) {
 
 static const char* weatherText(int code) {
   if (code < 0) return "";
-  if (code == 0) return "Sereno";
-  if (code <= 2) return "Poco nuvoloso";
-  if (code == 3) return "Nuvoloso";
-  if (code == 45 || code == 48) return "Nebbia";
-  if (code <= 57) return "Pioggerella";
-  if (code <= 67) return "Pioggia";
-  if (code <= 77) return "Neve";
-  if (code <= 82) return "Rovesci";
-  if (code <= 86) return "Neve";
-  return "Temporale";
+  if (code == 0) return T("Clear", "Sereno");
+  if (code <= 2) return T("Partly cloudy", "Poco nuvoloso");
+  if (code == 3) return T("Cloudy", "Nuvoloso");
+  if (code == 45 || code == 48) return T("Fog", "Nebbia");
+  if (code <= 57) return T("Drizzle", "Pioggerella");
+  if (code <= 67) return T("Rain", "Pioggia");
+  if (code <= 77) return T("Snow", "Neve");
+  if (code <= 82) return T("Showers", "Rovesci");
+  if (code <= 86) return T("Snow", "Neve");
+  return T("Thunderstorm", "Temporale");
 }
 
 static void drawPokeball(int x, int y, int r) {
@@ -950,9 +976,14 @@ static void drawFrame(uint16_t col) {
   canvas.drawRoundRect(1, 1, SCREEN_W - 2, SCREEN_H - 2, 13, col);
 }
 
-static const char* DOW_FULL[] = {"DOMENICA", "LUNEDI'", "MARTEDI'", "MERCOLEDI'", "GIOVEDI'", "VENERDI'", "SABATO"};
-static const char* MON_FULL[] = {"GENNAIO", "FEBBRAIO", "MARZO",  "APRILE",  "MAGGIO",   "GIUGNO",
-                                 "LUGLIO",  "AGOSTO",   "SETTEMBRE", "OTTOBRE", "NOVEMBRE", "DICEMBRE"};
+static const char* DOW_FULL_IT[] = {"DOMENICA", "LUNEDI'", "MARTEDI'", "MERCOLEDI'", "GIOVEDI'", "VENERDI'", "SABATO"};
+static const char* MON_FULL_IT[] = {"GENNAIO", "FEBBRAIO", "MARZO",  "APRILE",  "MAGGIO",   "GIUGNO",
+                                    "LUGLIO",  "AGOSTO",   "SETTEMBRE", "OTTOBRE", "NOVEMBRE", "DICEMBRE"};
+static const char* DOW_FULL_EN[] = {"SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"};
+static const char* MON_FULL_EN[] = {"JANUARY", "FEBRUARY", "MARCH",     "APRIL",   "MAY",      "JUNE",
+                                    "JULY",    "AUGUST",   "SEPTEMBER", "OCTOBER", "NOVEMBER", "DECEMBER"};
+#define DOW_FULL (uiLang == 1 ? DOW_FULL_IT : DOW_FULL_EN)
+#define MON_FULL (uiLang == 1 ? MON_FULL_IT : MON_FULL_EN)
 
 // testo dentro una "pillola" semitrasparente; align: -1 = ancorata a sinistra, +1 = a destra, 0 = centrata
 static void pillText(const char* s, int x, int y, int align, uint16_t col, uint16_t bg = C_BLACK, uint8_t alpha = 150) {
@@ -1030,11 +1061,11 @@ static void drawClockPage(const tm* t) {
   // --- in basso: giorno della settimana a sinistra, numero e mese a destra
   const int by = 222;
   if (ringing) {
-    const char* lab = ringingAlarm >= 0 && alarms[ringingAlarm].label[0] ? alarms[ringingAlarm].label : "SVEGLIA!";
-    const char* msgs[3] = {lab, "Tocca: posticipa", "Tieni premuto: spegni"};
+    const char* lab = ringingAlarm >= 0 && alarms[ringingAlarm].label[0] ? alarms[ringingAlarm].label : T("ALARM!", "SVEGLIA!");
+    const char* msgs[3] = {lab, T("Tap: snooze", "Tocca: posticipa"), T("Hold to stop", "Tieni premuto: spegni")};
     pillText(msgs[(millis() / 2000) % 3], CX, by, 0, C_WHITE, C_RED, 200);
   } else if (!t) {
-    pillText(WiFi.status() == WL_CONNECTED ? "Sincronizzo l'ora..." : "Wi-Fi assente", CX, by, 0, C_YELLOW);
+    pillText(WiFi.status() == WL_CONNECTED ? T("Syncing time...", "Sincronizzo l'ora...") : T("No Wi-Fi", "Wi-Fi assente"), CX, by, 0, C_YELLOW);
   } else {
     pillText(DOW_FULL[t->tm_wday], 6, by, -1, C_YELLOW);
     char db[24];
@@ -1062,25 +1093,25 @@ static void drawWeatherPage() {
 
   if (!w.valid) {
     drawPokeball(CX, 95, 34);
-    txt(WiFi.status() == WL_CONNECTED ? "Meteo in arrivo..." : "Wi-Fi assente", CX, 158, &fonts::FreeSans9pt7b, C_WHITE);
+    txt(WiFi.status() == WL_CONNECTED ? T("Loading weather...", "Meteo in arrivo...") : T("No Wi-Fi", "Wi-Fi assente"), CX, 158, &fonts::FreeSans9pt7b, C_WHITE);
     return;
   }
   char city[28];
-  strlcpy(city, w.city[0] ? w.city : "Meteo", sizeof(city));
+  strlcpy(city, w.city[0] ? w.city : T("Weather", "Meteo"), sizeof(city));
   txt(city, CX, 20, &fonts::FreeSansBold12pt7b, C_YELLOW);
   char now[40];
-  snprintf(now, sizeof(now), "Ora %d   %s", (int)lroundf(w.tempNow), weatherText(w.codeNow));
+  snprintf(now, sizeof(now), T("Now %d   %s", "Ora %d   %s"), (int)lroundf(w.tempNow), weatherText(w.codeNow));
   txt(now, CX, 46, &fonts::FreeSans9pt7b, C_WHITE);
   canvas.setFont(&fonts::FreeSans9pt7b);
   {  // simbolo dei gradi dopo la temperatura attuale
     char tb[12];
-    snprintf(tb, sizeof(tb), "Ora %d", (int)lroundf(w.tempNow));
+    snprintf(tb, sizeof(tb), T("Now %d", "Ora %d"), (int)lroundf(w.tempNow));
     int x = CX - canvas.textWidth(now) / 2 + canvas.textWidth(tb) + 4;
     canvas.drawCircle(x, 41, 2, C_WHITE);
   }
 
   canvas.drawFastVLine(CX, 64, 146, C_DGRAY);
-  const char* hdr[] = {"OGGI", "DOMANI"};
+  const char* hdr[] = {T("TODAY", "OGGI"), T("TOMORROW", "DOMANI")};
   for (int i = 0; i < 2; i++) {
     int cx = i == 0 ? CX - 80 : CX + 80;
     txt(hdr[i], cx, 74, &fonts::FreeSansBold9pt7b, C_CYAN);
@@ -1097,7 +1128,7 @@ static void drawWeatherPage() {
     tm u;
     localtime_r(&w.updated, &u);
     char ub[24];
-    snprintf(ub, sizeof(ub), "aggiornato alle %02d:%02d", u.tm_hour, u.tm_min);
+    snprintf(ub, sizeof(ub), T("updated at %02d:%02d", "aggiornato alle %02d:%02d"), u.tm_hour, u.tm_min);
     txt(ub, CX, 226, &fonts::Font0, C_GRAY);
   }
 }
@@ -1111,8 +1142,8 @@ static int alarmRowAt(int y) {
 static void drawAlarmsPage() {
   canvas.fillScreen(rgb(24, 24, 40));
   drawFrame(C_RED);
-  txt("SVEGLIE", CX, 20, &fonts::FreeSansBold12pt7b, C_YELLOW);
-  static const char* D = "LMMGVSD";
+  txt(T("ALARMS", "SVEGLIE"), CX, 20, &fonts::FreeSansBold12pt7b, C_YELLOW);
+  const char* D = T("MTWTFSS", "LMMGVSD");
   for (int i = 0; i < MAX_ALARMS; i++) {
     const Alarm& a = alarms[i];
     int y = 56 + i * 32;
@@ -1124,7 +1155,7 @@ static void drawAlarmsPage() {
     canvas.setTextDatum(textdatum_t::middle_center);
     if (a.days == 0) {
       canvas.setTextColor(a.enabled ? C_CYAN : C_DGRAY);
-      canvas.drawString("una volta", 172, y);
+      canvas.drawString(T("once", "una volta"), 172, y);
     } else {
       for (int d = 0; d < 7; d++) {
         canvas.setTextColor((a.days >> d & 1) ? (a.enabled ? C_CYAN : C_GRAY) : C_DGRAY);
@@ -1144,11 +1175,11 @@ static void drawAlarmsPage() {
   else if (WiFi.status() == WL_CONNECTED)
     snprintf(ib, sizeof(ib), "http://%s", ipString().c_str());
   else if (lastDiscReason == 201)
-    strlcpy(ib, "Wi-Fi: rete non trovata", sizeof(ib));
+    strlcpy(ib, T("Wi-Fi: network not found", "Wi-Fi: rete non trovata"), sizeof(ib));
   else if (lastDiscReason == 202 || lastDiscReason == 15 || lastDiscReason == 204)
-    strlcpy(ib, "Wi-Fi: password errata?", sizeof(ib));
+    strlcpy(ib, T("Wi-Fi: wrong password?", "Wi-Fi: password errata?"), sizeof(ib));
   else
-    strlcpy(ib, "Wi-Fi: riconnessione...", sizeof(ib));
+    strlcpy(ib, T("Wi-Fi: reconnecting...", "Wi-Fi: riconnessione..."), sizeof(ib));
   txt(ib, CX, 222, &fonts::Font2, C_CYAN);
 }
 
@@ -1156,15 +1187,15 @@ static void drawSetupPage() {
   canvas.fillScreen(C_NAVY);
   drawFrame(C_YELLOW);
   drawPokeball(CX, 44, 26);
-  txt("Configura il Wi-Fi", CX, 92, &fonts::FreeSansBold12pt7b, C_YELLOW);
-  txt("Collegati alla rete:", CX, 124, &fonts::FreeSans9pt7b, C_WHITE);
+  txt(T("Set up Wi-Fi", "Configura il Wi-Fi"), CX, 92, &fonts::FreeSansBold12pt7b, C_YELLOW);
+  txt(T("Join the network:", "Collegati alla rete:"), CX, 124, &fonts::FreeSans9pt7b, C_WHITE);
   txt(AP_SSID, CX, 148, &fonts::FreeSansBold9pt7b, C_CYAN);
   if (strlen(AP_PASSWORD)) {
     char pb[40];
     snprintf(pb, sizeof(pb), "password: %s", AP_PASSWORD);
     txt(pb, CX, 172, &fonts::FreeSans9pt7b, C_WHITE);
   }
-  txt("poi apri 192.168.4.1", CX, 204, &fonts::FreeSans9pt7b, C_WHITE);
+  txt(T("then open 192.168.4.1", "poi apri 192.168.4.1"), CX, 204, &fonts::FreeSans9pt7b, C_WHITE);
 }
 
 // i font FreeSans contengono solo ASCII: le lettere accentate diventano "a'", "e'"...
@@ -1201,7 +1232,7 @@ static void drawMessagePage(const char* text, uint32_t since) {
   canvas.fillScreen(C_NAVY);
   drawFrame(C_YELLOW);
   drawEnvelope(CX, 20, C_YELLOW);  // busta in alto, scritta sotto
-  txt("MESSAGGIO", CX, 46, &fonts::FreeSansBold12pt7b, C_YELLOW);
+  txt(T("MESSAGE", "MESSAGGIO"), CX, 46, &fonts::FreeSansBold12pt7b, C_YELLOW);
 
   // a capo per parole, larghezza fissa
   String s = asciiFold(text);
@@ -1240,7 +1271,7 @@ static void drawMessagePage(const char* text, uint32_t since) {
   for (int k = 0; k < shown; k++) txt(lines[first + k].c_str(), CX, y0 + k * LH, &fonts::FreeSans9pt7b, C_WHITE);
 
   const char* st = speechStatus();
-  const char* foot = strcmp(st, "download") == 0 ? "preparo la voce..." : strncmp(st, "errore", 6) == 0 ? "voce non disponibile" : "tocca per chiudere";
+  const char* foot = strcmp(st, "download") == 0 ? T("preparing voice...", "preparo la voce...") : strncmp(st, "error", 5) == 0 ? T("voice unavailable", "voce non disponibile") : T("tap to close", "tocca per chiudere");
   txt(foot, CX, 224, &fonts::Font2, C_CYAN);
 }
 
@@ -1424,7 +1455,7 @@ static void pollButtons() {
   if (M5.BtnB.wasHold()) {  // 3 secondi: rete di configurazione
     portalManual = true;
     startPortal();
-    showToast("Rete Setup attiva", 4000);
+    showToast(T("Setup network on", "Rete Setup attiva"), 4000);
     page = PAGE_ALARMS;
   }
 }
@@ -1463,7 +1494,7 @@ void setup() {
   canvas.setPsram(true);
   canvas.createSprite(SCREEN_W, SCREEN_H);
   gifBuf = (uint16_t*)ps_malloc(SCREEN_W * SCREEN_H * 2);
-  drawBootScreen("PokeSveglia", "Avvio...");
+  drawBootScreen("PokeSveglia", T("Starting...", "Avvio..."));
   lcd.setBrightness(200);
 
   leds.begin();
@@ -1473,6 +1504,13 @@ void setup() {
   if (!LittleFS.begin(true)) log_e("LittleFS non disponibile");
   LittleFS.mkdir("/gifs");
   loadConfig();
+  {  // paese rilevato l'ultima volta -> lingua già giusta dall'avvio
+    Preferences p;
+    p.begin("clock", true);
+    strlcpy(detectedCountry, p.getString("cc", "").c_str(), sizeof(detectedCountry));
+    p.end();
+    applyLanguage();
+  }
 
   audioBegin();
   hasAccelerometer = M5.Imu.isEnabled();
@@ -1506,7 +1544,7 @@ void setup() {
     for (int attempt = 1; attempt <= 3 && WiFi.status() != WL_CONNECTED; attempt++) {
       char l2[48];
       snprintf(l2, sizeof(l2), "%.28s (%d/3)", wifiSsid.c_str(), attempt);
-      drawBootScreen("Connessione a", l2);
+      drawBootScreen(T("Connecting to", "Connessione a"), l2);
       if (attempt == 1)
         WiFi.begin(wifiSsid.c_str(), wifiPass.c_str());
       else

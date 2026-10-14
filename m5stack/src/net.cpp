@@ -116,19 +116,21 @@ static bool locate() {
   JsonDocument doc;
   if (city[0]) {
     // città scelta a mano nella pagina web
-    String url = "https://geocoding-api.open-meteo.com/v1/search?count=1&language=it&format=json&name=" + urlEncode(city);
+    String url = String("https://geocoding-api.open-meteo.com/v1/search?count=1&format=json&language=") + (uiLang == 1 ? "it" : "en") + "&name=" + urlEncode(city);
     if (!httpGetJson(url, doc) || !doc["results"][0]) return false;
     JsonObject r = doc["results"][0];
     lat = r["latitude"];
     lon = r["longitude"];
     strlcpy(locCity, r["name"] | city, sizeof(locCity));
+    setDetectedCountry(r["country_code"] | "");
   } else {
     // posizione approssimativa dall'IP pubblico
-    if (!httpGetJson("http://ip-api.com/json/?fields=status,city,lat,lon", doc)) return false;
+    if (!httpGetJson("http://ip-api.com/json/?fields=status,city,lat,lon,countryCode", doc)) return false;
     if (strcmp(doc["status"] | "", "success") != 0) return false;
     lat = doc["lat"];
     lon = doc["lon"];
     strlcpy(locCity, doc["city"] | "", sizeof(locCity));
+    setDetectedCountry(doc["countryCode"] | "");
   }
   haveLoc = true;
   lastLocate = millis();

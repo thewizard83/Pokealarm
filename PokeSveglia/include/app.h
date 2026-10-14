@@ -22,6 +22,7 @@ struct Settings {
   uint8_t ringMaxMin = 10;   // dopo quanti minuti la sveglia si spegne da sola
   char city[48] = "";        // vuoto = automatico dall'IP
   char gif[40] = "charizard.gif";
+  uint8_t lang = 0;          // lingua: 0 = automatica (dal paese), 1 = inglese, 2 = italiano
 };
 
 struct DayWeather {
@@ -91,6 +92,12 @@ bool speechGetCurrent(char* buf, size_t len, uint32_t& shownSince);  // messaggi
 void speechDismiss();
 const char* speechStatus();     // "idle" / "download" / "voce" / "errore: ..."
 void speechHistoryJson(JsonArray arr);
+
+// lingua dell'interfaccia: 0 = inglese (predefinita), 1 = italiano
+extern volatile uint8_t uiLang;
+static inline const char* T(const char* en, const char* it) { return uiLang == 1 ? it : en; }
+void applyLanguage();                    // ricalcola uiLang da impostazione e paese
+void setDetectedCountry(const char* cc);  // codice paese ISO (es. "IT") rilevato dalla posizione
 
 // main.cpp
 void startPortal();

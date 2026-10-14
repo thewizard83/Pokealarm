@@ -57,6 +57,7 @@ static void handleState() {
   s["nightLightLevel"] = settings.nightLightLevel;
   s["city"] = settings.city;
   s["gif"] = settings.gif;
+  s["lang"] = settings.lang;
   doc["weather"]["valid"] = weather.valid;
   doc["weather"]["city"] = weather.city;
   xSemaphoreGive(dataMutex);
@@ -92,6 +93,7 @@ static void handleState() {
   }
   doc["accelerometer"] = hasAccelerometer;
   doc["timeSrc"] = (int)timeSource;
+  doc["lang"] = uiLang == 1 ? "it" : "en";
   int bl;
   bool bc, bu;
   if (batteryInfo(bl, bc, bu)) {
@@ -111,7 +113,7 @@ static void handleState() {
 static void handleAlarms() {
   JsonDocument doc;
   if (deserializeJson(doc, server.arg("plain")) || !doc.is<JsonArray>()) {
-    server.send(400, "text/plain", "JSON non valido");
+    server.send(400, "text/plain", "Invalid JSON");
     return;
   }
   JsonArray arr = doc.as<JsonArray>();
@@ -132,7 +134,7 @@ static void handleAlarms() {
 static void handleSettings() {
   JsonDocument doc;
   if (deserializeJson(doc, server.arg("plain"))) {
-    server.send(400, "text/plain", "JSON non valido");
+    server.send(400, "text/plain", "Invalid JSON");
     return;
   }
   bool cityChanged;
@@ -150,7 +152,9 @@ static void handleSettings() {
   const char* city = doc["city"] | settings.city;
   cityChanged = strcmp(city, settings.city) != 0;
   strlcpy(settings.city, city, sizeof(settings.city));
+  settings.lang = constrain((int)(doc["lang"] | settings.lang), 0, 2);
   xSemaphoreGive(dataMutex);
+  applyLanguage();
   saveConfig();
   if (cityChanged) weatherRefreshRequested = true;
   sendOk();
@@ -159,7 +163,7 @@ static void handleSettings() {
 static void handleGifSelect() {
   String name = cleanGifName(server.arg("name"));
   if (name.isEmpty() || !LittleFS.exists("/gifs/" + name)) {
-    server.send(404, "text/plain", "GIF non trovata");
+    server.send(404, "text/plain", "GIF not found");
     return;
   }
   xSemaphoreTake(dataMutex, portMAX_DELAY);
@@ -174,7 +178,7 @@ static void handleGifSelect() {
 static void handleTime() {
   JsonDocument doc;
   if (deserializeJson(doc, server.arg("plain"))) {
-    server.send(400, "text/plain", "JSON non valido");
+    server.send(400, "text/plain", "Invalid JSON");
     return;
   }
   time_t epoch = doc["epoch"] | (time_t)0;
@@ -199,17 +203,17 @@ static void handleTime() {
 static void handleMessage() {
   JsonDocument doc;
   if (deserializeJson(doc, server.arg("plain"))) {
-    server.send(400, "text/plain", "JSON non valido");
+    server.send(400, "text/plain", "Invalid JSON");
     return;
   }
   String text = doc["text"] | "";
   text.trim();
   if (text.isEmpty()) {
-    server.send(400, "text/plain", "Messaggio vuoto");
+    server.send(400, "text/plain", "Empty message");
     return;
   }
   if (!speechEnqueue(text.c_str())) {
-    server.send(503, "text/plain", "Troppi messaggi in coda, riprova tra poco");
+    server.send(503, "text/plain", "Too many queued messages, try again shortly");
     return;
   }
   sendOk();
@@ -218,7 +222,7 @@ static void handleMessage() {
 static void handleGifLayout() {
   JsonDocument doc;
   if (deserializeJson(doc, server.arg("plain"))) {
-    server.send(400, "text/plain", "JSON non valido");
+    server.send(400, "text/plain", "Invalid JSON");
     return;
   }
   gifLayX = constrain((int)(doc["x"] | 0), -240, 240);
@@ -232,7 +236,7 @@ static void handleGifLayout() {
 static void handleGifDelete() {
   String name = cleanGifName(server.arg("name"));
   if (name.isEmpty() || name == settings.gif) {
-    server.send(400, "text/plain", "Non puoi eliminare la GIF in uso");
+    server.send(400, "text/plain", "You can't delete the GIF in use");
     return;
   }
   LittleFS.remove("/gifs/" + name);
@@ -270,7 +274,7 @@ static void handleGifUploadDone() {
   if (uploadOk)
     sendOk();
   else
-    server.send(500, "text/plain", "Caricamento fallito (memoria piena?)");
+    server.send(500, "text/plain", "Upload failed (storage full?)");
 }
 
 static void handleScan() {
@@ -296,7 +300,7 @@ static void handleScan() {
 static void handleWifiSave() {
   JsonDocument doc;
   if (deserializeJson(doc, server.arg("plain")) || !(doc["ssid"] | "")[0]) {
-    server.send(400, "text/plain", "SSID mancante");
+    server.send(400, "text/plain", "Missing SSID");
     return;
   }
   saveWifi(doc["ssid"] | "", doc["pass"] | "");
@@ -311,7 +315,7 @@ static void handleNotFound() {
     server.sendHeader("Location", "http://" + WiFi.softAPIP().toString() + "/", true);
     server.send(302, "text/plain", "");
   } else {
-    server.send(404, "text/plain", "Non trovato");
+    server.send(404, "text/plain", "Not found");
   }
 }
 
