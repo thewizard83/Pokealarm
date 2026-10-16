@@ -414,6 +414,8 @@ static bool gifStep() {
 //  - "doppio colpetto": due colpi secchi sul case a 0,12-0,6 s di distanza,
 //     preceduti e seguiti da un momento di quiete (accende/spegne la luce notturna)
 static volatile bool shakeDetected = false;
+static volatile bool shakeArmed = false;      // "scuoti per spegnere" attivo solo mentre la sveglia suona
+static volatile uint32_t vibrationUntil = 0;  // la vibrazione scuote la sveglia: non va contata
 static volatile bool knockDetected = false;
 static volatile bool knockSuspended = false;  // durante sveglia/voce/vibrazione
 static volatile uint32_t lastTouchMs = 0;     // un tocco sullo schermo non deve contare come colpetto
@@ -430,13 +432,20 @@ static void imuTask(void*) {
     if (!M5.Imu.getAccel(&ax, &ay, &az)) continue;
     uint32_t now = millis();
 
-    // --- scuotere
+    // --- scuotere: contato solo mentre la sveglia suona. Prima i movimenti normali
+    // (prenderla in mano, appoggiarla, i colpetti) restavano "in memoria" e spegnevano
+    // all'istante la prima sveglia successiva.
     float dev = fabsf(sqrtf(ax * ax + ay * ay + az * az) - 1.0f);
-    if (now - shakeWindow > 1500) {
-      shakeWindow = now;
+    if (!shakeArmed || (int32_t)(now - vibrationUntil) < 0) {
       shakeHits = 0;
+      shakeWindow = now;
+    } else {
+      if (now - shakeWindow > 1500) {
+        shakeWindow = now;
+        shakeHits = 0;
+      }
+      if (dev > 0.8f && ++shakeHits >= 4) shakeDetected = true;
     }
-    if (dev > 0.8f && ++shakeHits >= 4) shakeDetected = true;
 
     // --- colpetti: variazione brusca dell'accelerazione tra due letture
     float jerk = havePrev ? sqrtf((ax - px) * (ax - px) + (ay - py) * (ay - py) + (az - pz) * (az - pz)) : 0;
@@ -622,7 +631,9 @@ static void updateLedsAndVibration() {
     leds.setBrightness(150);
     leds.show();
     // vibrazione a impulsi dopo i primi 10 secondi
-    M5.Power.setVibration(t > 10000 && (t % 1160) < 400 ? 180 : 0);
+    bool vib = t > 10000 && (t % 1160) < 400;
+    if (vib) vibrationUntil = millis() + 250;  // ignora anche il motorino che si ferma
+    M5.Power.setVibration(vib ? 180 : 0);
     wasActive = true;
   } else if (speaking) {
     uint8_t b = 30 + (uint8_t)(40 * (1 + sinf(millis() / 300.0f)));
@@ -745,6 +756,8 @@ static int nextAlarm(const tm& now, int& idx, int& dayOffset) {
 }
 
 static void startRing(int idx) {
+  shakeDetected = false;  // conta solo una scossa fatta mentre suona
+  shakeArmed = true;
   ringState = RING_ACTIVE;
   ringingAlarm = idx;
   ringStartMs = millis();
@@ -774,7 +787,7 @@ static void stopRing() {
 }
 
 static void alarmLogic() {
-  static int lastMinute = -1;
+  static time_t lastChecked = 0;  // inizio dell'ultimo minuto già controllato
   if (testAlarmRequested) {
     testAlarmRequested = false;
     startRing(-1);
@@ -793,25 +806,31 @@ static void alarmLogic() {
   if (ringState == RING_SNOOZED && time(nullptr) >= snoozeUntil) startRing(ringingAlarm);
 
   if (!timeValid()) return;
+  // Controlla TUTTI i minuti trascorsi dall'ultimo controllo (fino a 15 minuti), non solo
+  // quello attuale: così una sveglia non viene saltata se l'ora fa un salto in avanti
+  // (correzione da internet, dal chip RTC o dal telefono) o se l'avvio è stato lento.
   time_t now = time(nullptr);
-  tm t;
-  localtime_r(&now, &t);
-  if (t.tm_min == lastMinute) return;
-  bool firstCheck = lastMinute < 0;
-  lastMinute = t.tm_min;
-  if (firstCheck || ringState != RING_IDLE) return;  // niente sveglia al minuto di accensione
-
-  int bit = (t.tm_wday + 6) % 7;
-  for (int i = 0; i < MAX_ALARMS; i++) {
-    Alarm& a = alarms[i];
-    if (!a.enabled || a.hour != t.tm_hour || a.minute != t.tm_min) continue;
-    if (a.days && !(a.days >> bit & 1)) continue;
-    if (!a.days) {  // sveglia singola: si disattiva dopo aver suonato
-      a.enabled = false;
-      saveConfig();
+  time_t minuteNow = now - now % 60;
+  if (!lastChecked || minuteNow < lastChecked || minuteNow - lastChecked > 15 * 60)
+    lastChecked = minuteNow - 60;  // primo controllo, ora tornata indietro o salto enorme: solo il minuto attuale
+  while (lastChecked < minuteNow) {
+    lastChecked += 60;
+    if (ringState != RING_IDLE) continue;
+    tm t;
+    localtime_r(&lastChecked, &t);
+    int bit = (t.tm_wday + 6) % 7;
+    for (int i = 0; i < MAX_ALARMS; i++) {
+      Alarm& a = alarms[i];
+      if (!a.enabled || a.hour != t.tm_hour || a.minute != t.tm_min) continue;
+      if (a.days && !(a.days >> bit & 1)) continue;
+      if (!a.days) {  // sveglia singola: si disattiva dopo aver suonato
+        a.enabled = false;
+        saveConfig();
+      }
+      log_i("Sveglia %d delle %02d:%02d", i, a.hour, a.minute);
+      startRing(i);
+      break;
     }
-    startRing(i);
-    break;
   }
 }
 
@@ -1576,6 +1595,7 @@ void loop() {
   wifiMaintain();
   pollButtons();
   pollTouch();
+  shakeArmed = ringState == RING_ACTIVE;
   if (ringState == RING_ACTIVE && accelShaken()) stopRing();
   // doppio colpetto sulla sveglia: luce notturna (non mentre suona, parla o vibra)
   knockSuspended = ringState == RING_ACTIVE || audioIsSpeaking();

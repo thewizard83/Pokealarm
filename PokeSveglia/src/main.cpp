@@ -693,7 +693,7 @@ static void stopRing() {
 }
 
 static void alarmLogic() {
-  static int lastMinute = -1;
+  static time_t lastChecked = 0;  // inizio dell'ultimo minuto già controllato
   if (testAlarmRequested) {
     testAlarmRequested = false;
     startRing(-1);
@@ -712,25 +712,31 @@ static void alarmLogic() {
   if (ringState == RING_SNOOZED && time(nullptr) >= snoozeUntil) startRing(ringingAlarm);
 
   if (!timeValid()) return;
+  // Controlla TUTTI i minuti trascorsi dall'ultimo controllo (fino a 15 minuti), non solo
+  // quello attuale: così una sveglia non viene saltata se l'ora fa un salto in avanti
+  // (correzione da internet, dal chip RTC o dal telefono) o se l'avvio è stato lento.
   time_t now = time(nullptr);
-  tm t;
-  localtime_r(&now, &t);
-  if (t.tm_min == lastMinute) return;
-  bool firstCheck = lastMinute < 0;
-  lastMinute = t.tm_min;
-  if (firstCheck || ringState != RING_IDLE) return;  // niente sveglia al minuto di accensione
-
-  int bit = (t.tm_wday + 6) % 7;
-  for (int i = 0; i < MAX_ALARMS; i++) {
-    Alarm& a = alarms[i];
-    if (!a.enabled || a.hour != t.tm_hour || a.minute != t.tm_min) continue;
-    if (a.days && !(a.days >> bit & 1)) continue;
-    if (!a.days) {  // sveglia singola: si disattiva dopo aver suonato
-      a.enabled = false;
-      saveConfig();
+  time_t minuteNow = now - now % 60;
+  if (!lastChecked || minuteNow < lastChecked || minuteNow - lastChecked > 15 * 60)
+    lastChecked = minuteNow - 60;  // primo controllo, ora tornata indietro o salto enorme: solo il minuto attuale
+  while (lastChecked < minuteNow) {
+    lastChecked += 60;
+    if (ringState != RING_IDLE) continue;
+    tm t;
+    localtime_r(&lastChecked, &t);
+    int bit = (t.tm_wday + 6) % 7;
+    for (int i = 0; i < MAX_ALARMS; i++) {
+      Alarm& a = alarms[i];
+      if (!a.enabled || a.hour != t.tm_hour || a.minute != t.tm_min) continue;
+      if (a.days && !(a.days >> bit & 1)) continue;
+      if (!a.days) {  // sveglia singola: si disattiva dopo aver suonato
+        a.enabled = false;
+        saveConfig();
+      }
+      log_i("Sveglia %d delle %02d:%02d", i, a.hour, a.minute);
+      startRing(i);
+      break;
     }
-    startRing(i);
-    break;
   }
 }
 
